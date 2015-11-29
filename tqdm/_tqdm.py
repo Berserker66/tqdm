@@ -16,6 +16,12 @@ from ._utils import _supports_unicode, _environ_cols_wrapper, _range, _unich, \
 import sys
 from time import time
 
+try:  # pragma: no cover
+    from time import process_time
+except ImportError:  # pragma: no cover
+    from time import clock
+    process_time = clock
+
 
 __author__ = {"github.com/": ["noamraph", "obiwanus", "kmike", "hadim",
                               "casperdcl", "lrq3000"]}
@@ -316,6 +322,10 @@ class tqdm(object):
             WARNING: internal parameter - do not use.
             Use tqdm_gui(...) instead. If set, will attempt to use
             matplotlib animations for a graphical output [default: false].
+        cputime  : bool, optional
+            WARNING: internal parameter - do not use.
+            If set, will use cpu relative time instead of absolute time to
+            compute elapsed time. Useful for unit testing.
 
         Returns
         -------
@@ -358,6 +368,11 @@ class tqdm(object):
         if smoothing is None:
             smoothing = 0
 
+        if cputime:
+            _time = time
+        else:
+            _time = process_time
+
         # Store the arguments
         self.iterable = iterable
         self.desc = desc + ': ' if desc else ''
@@ -377,6 +392,7 @@ class tqdm(object):
         self.dynamic_ncols = dynamic_ncols
         self.smoothing = smoothing
         self.avg_rate = None
+        self._time = _time
         # if nested, at initial sp() call we replace '\r' by '\n' to
         # not overwrite the outer progress bar
         self.nested = nested
@@ -397,7 +413,7 @@ class tqdm(object):
                         self.desc, ascii, unit, unit_scale, None, bar_format))
 
         # Init the time counter
-        self.start_t = self.last_print_t = time()
+        self.start_t = self.last_print_t = _time()
 
     def __len__(self):
         return len(self.iterable) if self.iterable else self.total
@@ -437,6 +453,7 @@ class tqdm(object):
             smoothing = self.smoothing
             avg_rate = self.avg_rate
             bar_format = self.bar_format
+            _time = self._time
 
             try:
                 sp = self.sp
@@ -452,7 +469,7 @@ class tqdm(object):
                 delta_it = n - last_print_n
                 # check the counter first (avoid calls to time())
                 if delta_it >= miniters:
-                    cur_t = time()
+                    cur_t = _time()
                     delta_t = cur_t - last_print_t
                     if delta_t >= mininterval:
                         elapsed = cur_t - start_t
@@ -525,7 +542,7 @@ class tqdm(object):
         delta_it = self.n - self.last_print_n  # should be n?
         if delta_it >= self.miniters:
             # We check the counter first, to reduce the overhead of time()
-            cur_t = time()
+            cur_t = self._time()
             delta_t = cur_t - self.last_print_t
             if delta_t >= self.mininterval:
                 elapsed = cur_t - self.start_t
@@ -577,7 +594,7 @@ class tqdm(object):
 
         if self.leave:
             if self.last_print_n < self.n:
-                cur_t = time()
+                cur_t = self._time()
                 # stats for overall rate (no weighted average)
                 self.sp(format_meter(
                     self.n, self.total, cur_t - self.start_t,
@@ -594,7 +611,7 @@ class tqdm(object):
         """
         Restart tqdm timer from last print time.
         """
-        cur_t = time()
+        cur_t = self._time()
         self.start_t += cur_t - self.last_print_t
         self.last_print_t = cur_t
 
