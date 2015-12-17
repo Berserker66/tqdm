@@ -106,7 +106,7 @@ def test_iter_overhead_hard():
         a = 0
         with relative_timer() as time_tqdm:
             for i in trange(total, file=our_file, leave=True,
-                                miniters=1, mininterval=0, maxinterval=0):
+                            miniters=1, mininterval=0, maxinterval=0):
                 a += i
         assert(a == (total * total - total) / 2.0)
 
@@ -114,7 +114,7 @@ def test_iter_overhead_hard():
         with relative_timer() as time_bench:
             for i in _range(total):
                 a += i
-                our_file.write(("%i" % a)*40)
+                our_file.write(("%i" % a) * 40)
 
     # Compute relative overhead of tqdm against native range()
     try:
@@ -130,7 +130,7 @@ def test_manual_overhead_hard():
 
     with closing(MockFileNoWrite()) as our_file:
         t = tqdm(total=total * 10, file=our_file, leave=True,
-                    miniters=1, mininterval=0, maxinterval=0)
+                 miniters=1, mininterval=0, maxinterval=0)
         a = 0
         with relative_timer() as time_tqdm:
             for i in _range(total):
@@ -141,7 +141,7 @@ def test_manual_overhead_hard():
         with relative_timer() as time_bench:
             for i in _range(total):
                 a += i
-                our_file.write(("%i" % a)*40)
+                our_file.write(("%i" % a) * 40)
 
     # Compute relative overhead of tqdm against native range()
     try:

@@ -16,12 +16,6 @@ from ._utils import _supports_unicode, _environ_cols_wrapper, _range, _unich, \
 import sys
 from time import time
 
-try:  # pragma: no cover
-    from time import process_time
-except ImportError:  # pragma: no cover
-    from time import clock
-    process_time = clock
-
 
 __author__ = {"github.com/": ["noamraph", "obiwanus", "kmike", "hadim",
                               "casperdcl", "lrq3000"]}
@@ -322,10 +316,6 @@ class tqdm(object):
             WARNING: internal parameter - do not use.
             Use tqdm_gui(...) instead. If set, will attempt to use
             matplotlib animations for a graphical output [default: false].
-        cputime  : bool, optional
-            WARNING: internal parameter - do not use.
-            If set, will use cpu relative time instead of absolute time to
-            compute elapsed time. Useful for unit testing.
 
         Returns
         -------
@@ -368,11 +358,6 @@ class tqdm(object):
         if smoothing is None:
             smoothing = 0
 
-        if cputime:
-            _time = time
-        else:
-            _time = process_time
-
         # Store the arguments
         self.iterable = iterable
         self.desc = desc + ': ' if desc else ''
@@ -392,7 +377,7 @@ class tqdm(object):
         self.dynamic_ncols = dynamic_ncols
         self.smoothing = smoothing
         self.avg_rate = None
-        self._time = _time
+        self._time = time
         # if nested, at initial sp() call we replace '\r' by '\n' to
         # not overwrite the outer progress bar
         self.nested = nested
@@ -413,7 +398,7 @@ class tqdm(object):
                         self.desc, ascii, unit, unit_scale, None, bar_format))
 
         # Init the time counter
-        self.start_t = self.last_print_t = _time()
+        self.start_t = self.last_print_t = self._time()
 
     def __len__(self):
         return len(self.iterable) if self.iterable else self.total

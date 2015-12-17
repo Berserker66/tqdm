@@ -34,6 +34,16 @@ try:
 except NameError:
     _unicode = str
 
+try:
+    from time import process_time
+except ImportError:
+    from time import clock
+    process_time = clock
+
+def cpu_timify(t):
+    t._time = process_time
+    t.start_t = t.last_print_t = t._time()
+
 RE_rate = re.compile(r'(\d+\.\d+)it/s')
 
 
@@ -195,10 +205,13 @@ def test_max_interval():
         with closing(StringIO()) as our_file2:
             # with maxinterval but higher than loop sleep time
             t = tqdm(total=total, file=our_file, miniters=None, mininterval=0,
-                     smoothing=1, maxinterval=1e-2, cputime=True)
+                     smoothing=1, maxinterval=1e-2)
+            cpu_timify(t)
+            
             # without maxinterval
             t2 = tqdm(total=total, file=our_file2, miniters=None, mininterval=0,
-                      smoothing=1, maxinterval=None, cputime=True)
+                      smoothing=1, maxinterval=None)
+            cpu_timify(t2)
 
             assert t.dynamic_miniters
             assert t2.dynamic_miniters
@@ -222,7 +235,8 @@ def test_max_interval():
     # Test with maxinterval effect
     with closing(StringIO()) as our_file:
         t = tqdm(total=total, file=our_file, miniters=None, mininterval=0,
-                 smoothing=1, maxinterval=1e-4, cputime=True)
+                 smoothing=1, maxinterval=1e-4)
+        cpu_timify(t)
 
         # Increase 10 iterations at once
         t.update(bigstep)
@@ -237,9 +251,11 @@ def test_max_interval():
 
     # Test iteration based tqdm with maxinterval effect
     with closing(StringIO()) as our_file:
-        for i in tqdm(_range(total), file=our_file, miniters=None,
-                      mininterval=1e-5, smoothing=1, maxinterval=1e-4,
-                      cputime=True):
+        t2 = tqdm(_range(total), file=our_file, miniters=None,
+                  mininterval=1e-5, smoothing=1, maxinterval=1e-4)
+        cpu_timify(t2)
+        
+        for i in t2:
             if i >= (bigstep - 1) and ((i - (bigstep - 1)) % smallstep) == 0:
                 sleep(1e-2)
             if i >= 3 * bigstep:
@@ -325,7 +341,8 @@ def test_smoothed_dynamic_min_iters():
     with closing(StringIO()) as our_file:
         total = 100
         t = tqdm(total=total, file=our_file, miniters=None, mininterval=0,
-                 smoothing=0.5, maxinterval=0, cputime=True)
+                 smoothing=0.5, maxinterval=0)
+        cpu_timify(t)
 
         # Increase 10 iterations at once
         t.update(10)
@@ -356,7 +373,9 @@ def test_smoothed_dynamic_min_iters_with_min_interval():
 
         # Test manual updating tqdm
         t = tqdm(total=total, file=our_file, miniters=None, mininterval=1e-3,
-                 smoothing=1, maxinterval=0, cputime=True)
+                 smoothing=1, maxinterval=0)
+        cpu_timify(t)
+
         t.update(10)
         sleep(1e-2)
         for _ in _range(4):
@@ -367,9 +386,11 @@ def test_smoothed_dynamic_min_iters_with_min_interval():
 
     with closing(StringIO()) as our_file:
         # Test iteration-based tqdm
-        for i in tqdm(_range(total), file=our_file, miniters=None,
-                      mininterval=0.01, smoothing=1, maxinterval=0,
-                      cputime=True):
+        t2 = tqdm(_range(total), file=our_file, miniters=None,
+                  mininterval=0.01, smoothing=1, maxinterval=0)
+        cpu_timify(t2)
+
+        for i in t2:
             if i >= 10:
                 sleep(0.1)
             if i >= 14:
@@ -502,8 +523,10 @@ def test_smoothing():
 
     # -- Test disabling smoothing
     with closing(StringIO()) as our_file:
-        for _ in tqdm(_range(3), file=our_file, smoothing=None, leave=True,
-                      cputime=True):
+        t = tqdm(_range(3), file=our_file, smoothing=None, leave=True)
+        cpu_timify(t)
+
+        for _ in t:
             pass
         our_file.seek(0)
         assert '| 3/3 ' in our_file.read()
@@ -514,9 +537,14 @@ def test_smoothing():
     with closing(StringIO()) as our_file2:
         with closing(StringIO()) as our_file:
             t = tqdm(_range(3), file=our_file2, smoothing=None, leave=True,
-                     miniters=1, mininterval=0, cputime=True)
-            for i in tqdm(_range(3), file=our_file, smoothing=None, leave=True,
-                          miniters=1, mininterval=0, cputime=True):
+                     miniters=1, mininterval=0)
+            cpu_timify(t)
+
+            t2 = tqdm(_range(3), file=our_file, smoothing=None, leave=True,
+                      miniters=1, mininterval=0)
+            cpu_timify(t2)
+
+            for i in t2:
                 # Sleep more for first iteration and
                 # see how quickly rate is updated
                 if i == 0:
@@ -537,9 +565,14 @@ def test_smoothing():
     with closing(StringIO()) as our_file2:
         with closing(StringIO()) as our_file:
             t = tqdm(_range(3), file=our_file2, smoothing=1, leave=True,
-                     miniters=1, mininterval=0, cputime=True)
-            for i in tqdm(_range(3), file=our_file, smoothing=1, leave=True,
-                          miniters=1, mininterval=0, cputime=True):
+                     miniters=1, mininterval=0)
+            cpu_timify(t)
+
+            t2 = tqdm(_range(3), file=our_file, smoothing=1, leave=True,
+                      miniters=1, mininterval=0)
+            cpu_timify(t2)
+
+            for i in t2:
                 if i == 0:
                     sleep(0.01)
                 else:
@@ -556,9 +589,14 @@ def test_smoothing():
     with closing(StringIO()) as our_file2:
         with closing(StringIO()) as our_file:
             t = tqdm(_range(3), file=our_file2, smoothing=0.5, leave=True,
-                     miniters=1, mininterval=0, cputime=True)
-            for i in tqdm(_range(3), file=our_file, smoothing=0.5, leave=True,
-                          miniters=1, mininterval=0, cputime=True):
+                     miniters=1, mininterval=0)
+            cpu_timify(t)
+
+            t2 = tqdm(_range(3), file=our_file, smoothing=0.5, leave=True,
+                      miniters=1, mininterval=0)
+            cpu_timify(t2)
+
+            for i in t2:
                 if i == 0:
                     sleep(0.01)
                 else:
@@ -773,12 +811,3 @@ def test_no_gui():
 
         t = tqdm(total=1, gui=False, file=our_file)
         assert hasattr(t, "sp")
-
-
-def test_cputime():
-    """ Test internal relative time computation """
-    our_file = StringIO()
-    t1 = tqdm(total=2, file=our_file, cputime=True)
-    assert t1.cputime
-    t2 = tqdm(total=2, file=our_file, cputime=False)
-    assert not t2.cputime
