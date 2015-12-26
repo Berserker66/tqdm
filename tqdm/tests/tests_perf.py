@@ -1,8 +1,11 @@
+from nose.plugins.skip import SkipTest
+
 from contextlib import contextmanager
 
 import dis
 import re
 import sys
+from time import sleep
 
 from tqdm import trange
 from tqdm import tqdm
@@ -32,15 +35,30 @@ except ImportError:
     process_time = clock
 
 
-# def cpu_sleep(t):
-#     '''Sleep the given amount of cpu time'''
-#     start = process_time()
-#     while((process_time() - start) < t):
-#         pass
-
-
 def get_relative_time(prevtime=0):
     return process_time() - prevtime
+
+
+def cpu_sleep(t):
+    '''Sleep the given amount of cpu time'''
+    start = process_time()
+    while((process_time() - start) < t):
+        pass
+
+
+def checkCpuTime(sleeptime=0.2):
+    '''Check if cpu time works correctly'''
+    # First test that sleeping does not consume cputime
+    start1 = process_time()
+    sleep(sleeptime)
+    t1 = process_time() - start1
+
+    # secondly check by comparing to cpusleep (where we actually do something)
+    start2 = process_time()
+    cpu_sleep(sleeptime)
+    t2 = process_time() - start2
+
+    return (abs(t1) < 0.0001 and (t1 < t2 / 10))
 
 
 @contextmanager
@@ -79,6 +97,11 @@ RE_opcode_count = re.compile(r'^\s*(\d+)')
 
 def test_iter_overhead():
     """ Test overhead of iteration based tqdm """
+    try:
+        assert checkCpuTime()
+    except:
+        raise SkipTest
+
     total = int(1e6)
 
     with closing(MockFileNoWrite()) as our_file:
@@ -104,6 +127,11 @@ def test_iter_overhead():
 
 def test_manual_overhead():
     """ Test overhead of manual tqdm """
+    try:
+        assert checkCpuTime()
+    except:
+        raise SkipTest
+
     total = int(1e6)
 
     with closing(MockFileNoWrite()) as our_file:
@@ -130,6 +158,11 @@ def test_manual_overhead():
 
 def test_iter_overhead_hard():
     """ Test overhead of iteration based tqdm (hard) """
+    try:
+        assert checkCpuTime()
+    except:
+        raise SkipTest
+
     total = int(1e5)
 
     with closing(MockFileNoWrite()) as our_file:
@@ -156,6 +189,11 @@ def test_iter_overhead_hard():
 
 def test_manual_overhead_hard():
     """ Test overhead of manual tqdm (hard) """
+    try:
+        assert checkCpuTime()
+    except:
+        raise SkipTest
+
     total = int(1e5)
 
     with closing(MockFileNoWrite()) as our_file:
