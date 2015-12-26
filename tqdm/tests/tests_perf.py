@@ -28,6 +28,13 @@ except ImportError:
     process_time = clock
 
 
+# def cpu_sleep(t):
+#     '''Sleep the given amount of cpu time'''
+#     start = process_time()
+#     while((process_time() - start) < t):
+#         pass
+
+
 def get_relative_time(prevtime=0):
     return process_time() - prevtime
 
