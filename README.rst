@@ -27,20 +27,22 @@ Here's what the output looks like:
 
 |Screenshot|
 
-Overhead is low -- about 60ns per iteration (80ns with ``gui=True``).
+Overhead is low -- about 60ns per iteration (80ns with ``gui=True``), and is
+unit tested against performance regression.
 By comparison, the well established
-`ProgressBar <https://github.com/niltonvolpato/python-progressbar>`__ has
+`ProgressBar <https://code.google.com/p/python-progressbar/>`__ has
 an 800ns/iter overhead.
 
 In addition to its low overhead, ``tqdm`` uses smart algorithms to predict
-the remaining time and to skip unnecessary iteration displays, which allows
+the remaining time and to skip unneccessary iteration displays, which allows
 for a negligible overhead in most cases.
 
 ``tqdm`` works on any platform (Linux/Windows/Mac), in any console or in a
 GUI, and is also friendly with IPython/Jupyter notebooks.
 
 ``tqdm`` does not require any library (not even curses!) to run, just a
-vanilla Python interpreter will do.
+vanilla Python interpreter will do and an environment supporting ``carriage
+return \r`` and ``line feed \n`` control characters.
 
 ------------------------------------------
 
