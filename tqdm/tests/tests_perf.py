@@ -1,5 +1,9 @@
 from contextlib import contextmanager
 
+import dis
+import re
+import sys
+
 from tqdm import trange
 from tqdm import tqdm
 
@@ -52,6 +56,25 @@ class MockFileNoWrite(StringIO):
     """ Wraps StringIO to mock a file with no I/O """
     def write(self, data):
         return
+
+
+@contextmanager
+def captureStdOut(output):
+    stdout = sys.stdout
+    sys.stdout = output
+    yield
+    sys.stdout = stdout
+
+
+def getOpcodesCount(func):
+    out = StringIO()
+    with captureStdOut(out):
+        dis.dis(func)
+    opcodes = [s for s in out.getvalue().split('\n') if s]
+    return int(RE_opcode_count.search(opcodes[-1]).group(1))
+
+
+RE_opcode_count = re.compile(r'^\s*(\d+)')
 
 
 def test_iter_overhead():
@@ -156,3 +179,64 @@ def test_manual_overhead_hard():
     except AssertionError:
         raise AssertionError('tqdm(%g): %f, range(%g): %f' %
                              (total, time_tqdm(), total, time_bench()))
+
+
+def test_iter_overhead_hard_opcodes():
+    """ Test overhead of iteration based tqdm (hard with opcodes) """
+    total = int(10)
+
+    def f1():
+        with closing(MockFileNoWrite()) as our_file:
+            a = 0
+            with relative_timer() as time_tqdm:
+                for i in trange(total, file=our_file, leave=True,
+                                miniters=1, mininterval=0, maxinterval=0):
+                    a += i
+            assert(a == (total * total - total) / 2.0)
+
+    def f2():
+        a = 0
+        with relative_timer() as time_bench:
+            for i in _range(total):
+                a += i
+                our_file.write(("%i" % a) * 40)
+
+    # Compute opcodes overhead of tqdm against native range()
+    count1 = getOpcodesCount(f1)
+    count2 = getOpcodesCount(f2)
+    try:
+        assert(count1 < 3 * count2)
+    except AssertionError:
+        raise AssertionError('trange(%g): %i, range(%g): %i' %
+                             (total, count1, total, count2))
+
+
+def test_manual_overhead_hard_opcodes():
+    """ Test overhead of manual tqdm (hard with opcodes) """
+    total = int(10)
+
+    def f1():
+        with closing(MockFileNoWrite()) as our_file:
+            t = tqdm(total=total * 10, file=our_file, leave=True,
+                     miniters=1, mininterval=0, maxinterval=0)
+            a = 0
+            with relative_timer() as time_tqdm:
+                for i in _range(total):
+                    a += i
+                    t.update(10)
+
+    def f2():
+        a = 0
+        with relative_timer() as time_bench:
+            for i in _range(total):
+                a += i
+                our_file.write(("%i" % a) * 40)
+
+    # Compute opcodes overhead of tqdm against native range()
+    count1 = getOpcodesCount(f1)
+    count2 = getOpcodesCount(f2)
+    try:
+        assert(count1 < 3 * count2)
+    except AssertionError:
+        raise AssertionError('tqdm(%g): %f, range(%g): %f' %
+                             (total, count1, total, count2))
