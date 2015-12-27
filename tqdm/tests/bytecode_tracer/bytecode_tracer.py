@@ -4,9 +4,9 @@ import re
 
 from types import CodeType, MethodType
 
-import code_rewriting_importer
+from . import code_rewriting_importer
 
-from py_frame_object import get_value_stack_top
+from .py_frame_object import get_value_stack_top
 
 
 class ValueStack(object):
