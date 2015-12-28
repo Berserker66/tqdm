@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, division
 
 from nose.plugins.skip import SkipTest
 
@@ -7,7 +7,7 @@ from contextlib import contextmanager
 import inspect
 import re
 import sys
-from time import sleep
+from time import sleep, time
 from bytecode_tracer import BytecodeTracer
 from bytecode_tracer import rewrite_function
 
@@ -78,6 +78,70 @@ class MockFileNoWrite(StringIO):
     """ Wraps StringIO to mock a file with no I/O """
     def write(self, data):
         return
+
+
+def simple_progress(iterable=None, total=None, file=sys.stdout, desc='', leave=False, miniters=1, mininterval=0.1, width=60):
+    """ Simple progress bar reproducing tqdm's major features """
+    n = [0]  # use a closure
+    start_t = [time()]
+    last_n = [0]
+    last_t = [0]
+    if iterable is not None:
+        total = len(iterable)
+
+    def format_interval(t):
+        mins, s = divmod(int(t), 60)
+        h, m = divmod(mins, 60)
+        if h:
+            return '{0:d}:{1:02d}:{2:02d}'.format(h, m, s)
+        else:
+            return '{0:02d}:{1:02d}'.format(m, s)
+
+    def update_and_print(i=1):
+        n[0] += i
+        if (n[0] - last_n[0]) >= miniters:
+            last_n[0] = n[0]
+            
+            cur_t = time()
+            if (cur_t - last_t[0]) >= mininterval:
+                last_t[0] = cur_t
+
+                spent = cur_t - start_t[0]
+                spent_fmt = format_interval(spent)
+                eta = spent / n[0] * total if n[0] else 0
+                frac = n[0] / total
+                rate =  n[0] / spent if spent > 0 else 0
+                eta = (total - n[0]) / rate if rate > 0 else 0
+                eta_fmt = format_interval(eta)
+                if 0.0 < rate < 1.0:
+                    rate_fmt = "%.2fs/it" % (1.0 / rate)
+                else:
+                    rate_fmt = "%.2fit/s" % rate
+                percentage = int(frac * 100)
+                bar = "#" * int(frac * width)
+                barfill = " " * int((1.0 - frac) * width)
+                bar_length, frac_bar_length = divmod(
+                    int(frac * width * 10), 10)
+                bar = '#' * bar_length
+                frac_bar = chr(48 + frac_bar_length) if frac_bar_length \
+                    else ' '
+                file.write("\r%s %i%%|%s%s%s| %i/%i [%s<%s, %s]" % (desc,
+                                    percentage, bar, frac_bar, barfill, n[0],
+                                    total, spent_fmt, eta_fmt, rate_fmt))
+                if n[0] == total and leave:
+                    file.write("\n")
+                file.flush()
+
+    def update_and_yield():
+        for elt in iterable:
+            yield elt
+            update_and_print()
+
+    update_and_print(0)
+    if iterable is not None:
+        return update_and_yield
+    else:
+        return update_and_print
 
 
 btracer = BytecodeTracer()
@@ -314,8 +378,79 @@ def test_manual_overhead_hard():
                              (total, time_tqdm(), total, time_bench()))
 
 
+def test_iter_overhead_simplebar_hard():
+    """ Test overhead of iteration based tqdm vs simple progress bar (hard) """
+    try:
+        assert checkCpuTime()
+    except:
+        raise SkipTest
+
+    total = int(1e4)
+
+    with closing(MockFileNoWrite()) as our_file:
+        a = 0
+        with relative_timer() as time_tqdm:
+            for i in trange(total, file=our_file, leave=True,
+                            miniters=1, mininterval=0, maxinterval=0):
+                a += i
+        assert(a == (total * total - total) / 2.0)
+
+        a = 0
+        with relative_timer() as time_bench:
+            simplebar_iter = simple_progress(_range(total), file=our_file,
+                                        leave=True, miniters=1, mininterval=0)
+            for i in simplebar_iter():
+                a += i
+
+    # Compute relative overhead of tqdm against native range()
+    try:
+        assert(time_tqdm() < 1.5 * time_bench())
+    except AssertionError:
+        raise AssertionError('trange(%g): %f, simple_progress(%g): %f' %
+                             (total, time_tqdm(), total, time_bench()))
+
+
+def test_manual_overhead_simplebar_hard():
+    """ Test overhead of manual tqdm vs simple progress bar (hard) """
+    try:
+        assert checkCpuTime()
+    except:
+        raise SkipTest
+
+    total = int(1e4)
+
+    with closing(MockFileNoWrite()) as our_file:
+        t = tqdm(total=total * 10, file=our_file, leave=True,
+                 miniters=1, mininterval=0, maxinterval=0)
+        a = 0
+        with relative_timer() as time_tqdm:
+            for i in _range(total):
+                a += i
+                t.update(10)
+
+        simplebar_update = simple_progress(total=total, file=our_file,
+                                        leave=True, miniters=1, mininterval=0)
+        a = 0
+        with relative_timer() as time_bench:
+            for i in _range(total):
+                a += i
+                simplebar_update(10)
+
+    # Compute relative overhead of tqdm against native range()
+    try:
+        assert(time_tqdm() < 1.5 * time_bench())
+    except AssertionError:
+        raise AssertionError('tqdm(%g): %f, simple_progress(%g): %f' %
+                             (total, time_tqdm(), total, time_bench()))
+
+
 def test_iter_overhead_hard_opcodes():
     """ Test overhead of iteration based tqdm (hard with opcodes) """
+    try:
+        import imputil
+    except ImportError:
+        raise SkipTest
+
     total = int(10)
 
     def f1():
@@ -348,6 +483,11 @@ def test_iter_overhead_hard_opcodes():
 
 def test_manual_overhead_hard_opcodes():
     """ Test overhead of manual tqdm (hard with opcodes) """
+    try:
+        import imputil
+    except ImportError:
+        raise SkipTest
+
     total = int(10)
 
     def f1():
