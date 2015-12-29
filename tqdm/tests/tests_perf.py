@@ -4,8 +4,6 @@ from nose.plugins.skip import SkipTest
 
 from contextlib import contextmanager
 
-import inspect
-import re
 import sys
 from time import sleep, time
 
